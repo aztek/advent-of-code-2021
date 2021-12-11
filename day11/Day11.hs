@@ -4,16 +4,27 @@ import Control.Monad.State (gets, modify, evalState, State)
 import Data.Bifunctor (bimap)
 import Data.Char (digitToInt, intToDigit)
 import Data.Map (Map, (!))
+import Data.Maybe (fromJust, listToMaybe, mapMaybe)
 import qualified Data.Map as Map
 
 main :: IO ()
 main = do
   octo <- parse <$> getContents
-  print (part1 100 octo)
+  -- print (part1 100 octo)
+  print (fromJust $ part2 octo)
 
 part1 :: Int -> Octopodes -> Int
 part1 steps = sum . map countZeros . take (1 + steps) . iterate step
   where countZeros = length . filter (== 0) . Map.elems
+
+part2 :: Octopodes -> Maybe Int
+part2 = search (uncurry allFlash) . zip [0..] . iterate step
+  where countZeros = length . filter (== 0) . Map.elems
+        allFlash s octo | all (== 0) (Map.elems octo) = Just s
+                        | otherwise = Nothing
+
+search :: (a -> Maybe b) -> [a] -> Maybe b
+search f = listToMaybe . mapMaybe f
 
 type Energy = Int
 type Coord = (Int, Int)
