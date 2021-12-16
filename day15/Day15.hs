@@ -9,46 +9,59 @@ import qualified Data.Set as Set
 
 main :: IO ()
 main = do
-  input <- parse <$> getContents
-  print (part1 input)
+  matrix <- parseMatrix <$> getContents
+  print (part1 matrix)
+  print (part2 matrix)
+
+part1 :: [[Int]] -> Int
+part1 = minimalDanger . parseCavern
+
+part2 :: [[Int]] -> Int
+part2 = minimalDanger . parseCavern . expandCavern
 
 type Position = (Int, Int)
-type Risk = Int
 data Cavern = Cavern {
   height :: Int,
   width  :: Int,
-  risks  :: Map Position Risk
+  risks  :: Map Position Int
 } deriving (Show)
 
-parse :: String -> Cavern
-parse = fromMatrix . map (map digitToInt) . lines
-  where fromMatrix matrix = Cavern height width risks
-          where height = length matrix
-                width  = length (head matrix)
-                risks  = Map.fromList
-                       $ do (x, row)  <- zip [0..] matrix
-                            (y, risk) <- zip [0..] row
-                            return ((x, y), risk)
+parseMatrix :: String -> [[Int]]
+parseMatrix = map (map digitToInt) . lines
 
-part1 :: Cavern -> Risk
-part1 (Cavern height width risks) = minimalDangers ! (0, 0)
-  where
-    minimalDangers = dijkstra (Set.fromList positions) initDangers
+parseCavern :: [[Int]] -> Cavern
+parseCavern matrix = Cavern height width risks
+  where height = length matrix
+        width  = length (head matrix)
+        risks  = Map.fromList
+               $ do (x, row)  <- zip [0..] matrix
+                    (y, risk) <- zip [0..] row
+                    return ((x, y), risk)
 
-    dijkstra :: Set Position -> Map Position Risk -> Map Position Risk
-    dijkstra unseen dangers | Set.size unseen < 2 = dangers
-    dijkstra unseen dangers = dijkstra unseen' dangers'
-      where pos = minimumBy (compare `on` (dangers !)) unseen
-            unseen'   = Set.delete pos unseen
-            neighbors = filter (`elem` unseen) (adjacent pos)
-            immediate = risks ! pos + dangers ! pos
-            dangers'  = foldr (Map.adjust (min immediate)) dangers neighbors
+expandCavern :: [[Int]] -> [[Int]]
+expandCavern = foldl1 juxtapose . explode . concat . explode
+  where juxtapose = zipWith (++)
+        explode = take 5 . iterate (map (map inc))
+        inc x = if x + 1 > 9 then 1 else x + 1
 
-    initDangers = Map.fromList $ zip positions (map initDanger positions)
+minimalDanger :: Cavern -> Int
+minimalDanger (Cavern height width risks) = minimalDangers ! (0, 0)
+  where minimalDangers = dijkstra (Set.fromList positions) initDangers
 
-    initDanger pos = if pos == (height-1, width-1) then 0 else maxBound
+        dijkstra :: Set Position -> Map Position Int -> Map Position Int
+        dijkstra unseen dangers | Set.size unseen < 2 = dangers
+        dijkstra unseen dangers = dijkstra unseen' dangers'
+          where pos = minimumBy (compare `on` (dangers !)) unseen
+                unseen'   = Set.delete pos unseen
+                neighbors = filter (`elem` unseen) (adjacent pos)
+                immediate = risks ! pos + dangers ! pos
+                dangers'  = foldr (Map.adjust (min immediate)) dangers neighbors
 
-    positions = liftM2 (,) [0..height-1] [0..width-1]
+        initDangers = Map.fromList $ zip positions (map initDanger positions)
 
-    adjacent (x, y) = filter valid [(x-1, y), (x+1, y), (x, y-1), (x, y+1)]
-    valid (x, y) = x >= 0 && x < height && y >= 0 && y < width
+        initDanger pos = if pos == (height-1, width-1) then 0 else maxBound
+
+        positions = liftM2 (,) [0..height-1] [0..width-1]
+
+        adjacent (x, y) = filter valid [(x-1, y), (x+1, y), (x, y-1), (x, y+1)]
+        valid (x, y) = x >= 0 && x < height && y >= 0 && y < width
